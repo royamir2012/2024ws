@@ -43,16 +43,58 @@
         h1 {
             color: #2c3e50;
             text-align: center;
+            margin-bottom: 30px;
         }
         h2 {
             color: #34495e;
-            margin-top: 20px;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
         }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-top: 20px;
+            margin-bottom: 30px;
+        }
+        .table-container {
+            margin-top: 30px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        th {
+            background-color: #f8f9fa;
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+        }
+        td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -62,20 +104,20 @@
         
         <div class="stats-grid">
             <div class="stat-box">
-                <h3>Total Unique Players</h3>
-                <p>{{ stats.total_unique_ips }}</p>
+                <div class="stat-label">Total Unique Players</div>
+                <div class="stat-value" id="total-unique-ips">{{ stats.total_unique_ips }}</div>
             </div>
             <div class="stat-box">
-                <h3>Total Commands</h3>
-                <p>{{ stats.total_commands }}</p>
+                <div class="stat-label">Total Commands</div>
+                <div class="stat-value" id="total-commands">{{ stats.total_commands }}</div>
             </div>
             <div class="stat-box">
-                <h3>New Games Started</h3>
-                <p>{{ stats.new_games }}</p>
+                <div class="stat-label">New Games Started</div>
+                <div class="stat-value" id="new-games">{{ stats.new_games }}</div>
             </div>
             <div class="stat-box">
-                <h3>Average Moves per Game</h3>
-                <p>{{ "%.1f"|format(stats.total_commands / stats.new_games if stats.new_games > 0 else 0) }}</p>
+                <div class="stat-label">Average Moves per Game</div>
+                <div class="stat-value">{{ "%.1f"|format(stats.total_commands / stats.new_games if stats.new_games > 0 else 0) }}</div>
             </div>
         </div>
 
@@ -98,47 +140,115 @@
             </div>
         </div>
 
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        <h2>Recent Activity</h2>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>IP Address</th>
-                                        <th>Platform</th>
-                                        <th>Browser</th>
-                                        <th>Device Type</th>
-                                        <th>Event Type</th>
-                                        <th>Event Data</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recent-events">
-                                    {% for event in recent_events %}
-                                    <tr>
-                                        <td>{{ event.timestamp }}</td>
-                                        <td>{{ event.ip_address }}</td>
-                                        <td>{{ event.platform }}</td>
-                                        <td>{{ event.browser }}</td>
-                                        <td>{{ event.device_type }}</td>
-                                        <td>{{ event.event_type }}</td>
-                                        <td>{{ event.event_data }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="table-container">
+            <h2>Recent Activity</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP</th>
+                        <th>Platform</th>
+                        <th>Browser</th>
+                        <th>Device</th>
+                        <th>Event</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-events">
+                    {% for event in recent_events %}
+                    <tr>
+                        <td>{{ event.timestamp }}</td>
+                        <td>{{ event.ip_address }}</td>
+                        <td>{{ event.platform }}</td>
+                        <td>{{ event.browser }}</td>
+                        <td>{{ event.device_type }}</td>
+                        <td>{{ event.event_type }}</td>
+                        <td>{{ event.event_data }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 
     <script>
-        // Moves by direction chart
+        // Format timestamp to show only date and time with seconds
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-GB', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '');
+        }
+
+        // Format IP address to show only the first occurrence
+        function formatIPAddress(ip) {
+            return ip.split(',')[0].trim();
+        }
+
+        // Function to fetch dashboard data
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/dashboard-data');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Update stats
+                    document.getElementById('total-unique-ips').textContent = data.stats.total_unique_ips;
+                    document.getElementById('total-commands').textContent = data.stats.total_commands;
+                    document.getElementById('new-games').textContent = data.stats.new_games;
+
+                    // Update charts
+                    Plotly.update('moveChart', {
+                        values: [
+                            data.stats.moves_by_direction.up,
+                            data.stats.moves_by_direction.down,
+                            data.stats.moves_by_direction.left,
+                            data.stats.moves_by_direction.right
+                        ]
+                    });
+
+                    Plotly.update('platformChart', {
+                        values: [data.stats.platform_stats.web, data.stats.platform_stats.ios]
+                    });
+
+                    const browserStats = data.stats.browser_stats;
+                    Plotly.update('browserChart', {
+                        values: browserStats.map(item => item[1]),
+                        labels: browserStats.map(item => item[0] || 'Unknown')
+                    });
+
+                    const deviceStats = data.stats.device_stats;
+                    Plotly.update('deviceChart', {
+                        values: deviceStats.map(item => item[1]),
+                        labels: deviceStats.map(item => item[0] || 'Unknown')
+                    });
+
+                    // Update recent events table
+                    const recentEventsHtml = data.recent_events.map(event => `
+                        <tr>
+                            <td>${formatTimestamp(event.timestamp)}</td>
+                            <td>${formatIPAddress(event.ip_address)}</td>
+                            <td>${event.platform}</td>
+                            <td>${event.browser || 'Unknown'}</td>
+                            <td>${event.device_type || 'Unknown'}</td>
+                            <td>${event.event_type}</td>
+                            <td>${event.event_data || '-'}</td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('recent-events').innerHTML = recentEventsHtml;
+                }
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            }
+        }
+
+        // Initial charts setup
         const moveData = {
             values: [
                 {{ stats.moves_by_direction.up }},
@@ -157,7 +267,6 @@
             margin: { t: 0, b: 0, l: 0, r: 0 }
         });
 
-        // Platform distribution chart
         const platformData = {
             values: [{{ stats.platform_stats.web }}, {{ stats.platform_stats.ios }}],
             labels: ['Web', 'iOS'],
@@ -171,7 +280,6 @@
             margin: { t: 0, b: 0, l: 0, r: 0 }
         });
 
-        // Browser distribution chart
         const browserStats = {{ stats.browser_stats|tojson }};
         const browserData = {
             values: browserStats.map(item => item[1]),
@@ -186,7 +294,6 @@
             margin: { t: 0, b: 0, l: 0, r: 0 }
         });
 
-        // Device type distribution chart
         const deviceStats = {{ stats.device_stats|tojson }};
         const deviceData = {
             values: deviceStats.map(item => item[1]),
@@ -201,73 +308,10 @@
             margin: { t: 0, b: 0, l: 0, r: 0 }
         });
 
-        // Update dashboard with new data
-        function updateDashboard(data) {
-            // Update stats cards
-            document.getElementById('unique-players').textContent = data.stats.total_unique_ips;
-            document.getElementById('total-commands').textContent = data.stats.total_commands;
-            document.getElementById('new-games').textContent = data.stats.new_games;
-            document.getElementById('avg-moves').textContent = 
-                (data.stats.new_games > 0 ? (data.stats.total_commands / data.stats.new_games).toFixed(1) : '0.0');
+        // Initial data load
+        fetchDashboardData();
 
-            // Update charts
-            const moveChart = document.getElementById('moveChart');
-            const platformChart = document.getElementById('platformChart');
-            const browserChart = document.getElementById('browserChart');
-            const deviceChart = document.getElementById('deviceChart');
-
-            Plotly.update(moveChart, {
-                values: [
-                    data.stats.moves_by_direction.up,
-                    data.stats.moves_by_direction.down,
-                    data.stats.moves_by_direction.left,
-                    data.stats.moves_by_direction.right
-                ]
-            });
-
-            Plotly.update(platformChart, {
-                values: [data.stats.platform_stats.web, data.stats.platform_stats.ios]
-            });
-
-            const browserStats = data.stats.browser_stats;
-            Plotly.update(browserChart, {
-                values: browserStats.map(item => item[1]),
-                labels: browserStats.map(item => item[0] || 'Unknown')
-            });
-
-            const deviceStats = data.stats.device_stats;
-            Plotly.update(deviceChart, {
-                values: deviceStats.map(item => item[1]),
-                labels: deviceStats.map(item => item[0] || 'Unknown')
-            });
-
-            // Update recent events table
-            const recentEventsHtml = data.recent_events.map(event => `
-                <tr>
-                    <td>${new Date(event.timestamp).toLocaleString()}</td>
-                    <td>${event.ip_address}</td>
-                    <td>${event.platform}</td>
-                    <td>${event.browser || 'Unknown'}</td>
-                    <td>${event.device_type || 'Unknown'}</td>
-                    <td>${event.event_type}</td>
-                    <td>${event.event_data || '-'}</td>
-                </tr>
-            `).join('');
-            document.getElementById('recent-events').innerHTML = recentEventsHtml;
-        }
-
-        // Fetch new data
-        async function fetchDashboardData() {
-            try {
-                const response = await fetch('/dashboard-data');
-                const data = await response.json();
-                updateDashboard(data);
-            } catch (error) {
-                console.error('Error fetching dashboard data:', error);
-            }
-        }
-
-        // Update dashboard every second
+        // Set up auto-refresh every 1 second
         setInterval(fetchDashboardData, 1000);
     </script>
 </body>

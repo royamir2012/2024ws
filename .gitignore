@@ -23,3 +23,6 @@ var/
 .venv
 venv/
 ENV/
+instance/
+*.bak
+*.db
