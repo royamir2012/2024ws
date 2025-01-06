@@ -38,5 +38,22 @@ def dashboard():
     recent_events = GameAnalytics.query.order_by(GameAnalytics.timestamp.desc()).limit(10).all()
     return render_template('dashboard.html', stats=stats, recent_events=recent_events)
 
+@app.route('/dashboard-data')
+def dashboard_data():
+    stats = GameAnalytics.get_stats()
+    recent_events = [
+        {
+            'timestamp': event.timestamp.isoformat(),
+            'ip_address': event.ip_address,
+            'event_type': event.event_type,
+            'event_data': event.event_data
+        }
+        for event in GameAnalytics.query.order_by(GameAnalytics.timestamp.desc()).limit(10).all()
+    ]
+    return jsonify({
+        'stats': stats,
+        'recent_events': recent_events
+    })
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001, host='0.0.0.0')

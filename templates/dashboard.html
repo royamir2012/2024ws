@@ -25,12 +25,12 @@
         <h1 class="mb-4">2048 Game Analytics Dashboard</h1>
         
         <!-- Summary Cards -->
-        <div class="row mb-4">
+        <div class="row mb-4" id="stats-cards">
             <div class="col-md-3">
                 <div class="card stats-card bg-primary text-white">
                     <div class="card-body">
                         <h5 class="card-title">Unique Players</h5>
-                        <h2 class="card-text">{{ stats.total_unique_ips }}</h2>
+                        <h2 class="card-text" id="unique-players">{{ stats.total_unique_ips }}</h2>
                     </div>
                 </div>
             </div>
@@ -38,7 +38,7 @@
                 <div class="card stats-card bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title">Total Commands</h5>
-                        <h2 class="card-text">{{ stats.total_commands }}</h2>
+                        <h2 class="card-text" id="total-commands">{{ stats.total_commands }}</h2>
                     </div>
                 </div>
             </div>
@@ -46,7 +46,7 @@
                 <div class="card stats-card bg-info text-white">
                     <div class="card-body">
                         <h5 class="card-title">New Games</h5>
-                        <h2 class="card-text">{{ stats.new_games }}</h2>
+                        <h2 class="card-text" id="new-games">{{ stats.new_games }}</h2>
                     </div>
                 </div>
             </div>
@@ -54,7 +54,7 @@
                 <div class="card stats-card bg-warning text-white">
                     <div class="card-body">
                         <h5 class="card-title">Avg. Moves/Game</h5>
-                        <h2 class="card-text">{{ "%.1f"|format(stats.total_commands / stats.new_games if stats.new_games > 0 else 0) }}</h2>
+                        <h2 class="card-text" id="avg-moves">{{ "%.1f"|format(stats.total_commands / stats.new_games if stats.new_games > 0 else 0) }}</h2>
                     </div>
                 </div>
             </div>
@@ -86,7 +86,7 @@
                                         <th>Data</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="recent-events">
                                     {% for event in recent_events %}
                                     <tr>
                                         <td>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
@@ -105,41 +105,96 @@
     </div>
 
     <script>
-        // Move Distribution Chart
-        const moveData = {{ stats.moves_by_direction | tojson }};
-        const ctx = document.getElementById('moveChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(moveData),
-                datasets: [{
-                    label: 'Number of Moves',
-                    data: Object.values(moveData),
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.5)',
-                        'rgba(54, 162, 235, 0.5)',
-                        'rgba(255, 206, 86, 0.5)',
-                        'rgba(75, 192, 192, 0.5)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true
+        let moveChart;
+
+        // Initialize chart
+        function initializeChart(data) {
+            const ctx = document.getElementById('moveChart').getContext('2d');
+            moveChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: 'Number of Moves',
+                        data: Object.values(data),
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.5)',
+                            'rgba(54, 162, 235, 0.5)',
+                            'rgba(255, 206, 86, 0.5)',
+                            'rgba(75, 192, 192, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
+            });
+        }
+
+        // Update chart data
+        function updateChart(data) {
+            moveChart.data.datasets[0].data = Object.values(data);
+            moveChart.update();
+        }
+
+        // Format timestamp
+        function formatTimestamp(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+
+        // Update dashboard with new data
+        function updateDashboard(data) {
+            // Update stats cards
+            document.getElementById('unique-players').textContent = data.stats.total_unique_ips;
+            document.getElementById('total-commands').textContent = data.stats.total_commands;
+            document.getElementById('new-games').textContent = data.stats.new_games;
+            document.getElementById('avg-moves').textContent = 
+                (data.stats.new_games > 0 ? (data.stats.total_commands / data.stats.new_games).toFixed(1) : '0.0');
+
+            // Update move distribution chart
+            updateChart(data.stats.moves_by_direction);
+
+            // Update recent events table
+            const recentEventsHtml = data.recent_events.map(event => `
+                <tr>
+                    <td>${formatTimestamp(event.timestamp)}</td>
+                    <td>${event.ip_address}</td>
+                    <td>${event.event_type}</td>
+                    <td>${event.event_data || '-'}</td>
+                </tr>
+            `).join('');
+            document.getElementById('recent-events').innerHTML = recentEventsHtml;
+        }
+
+        // Fetch new data
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/dashboard-data');
+                const data = await response.json();
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
             }
-        });
+        }
+
+        // Initialize chart with initial data
+        initializeChart({{ stats.moves_by_direction | tojson }});
+
+        // Update dashboard every second
+        setInterval(fetchDashboardData, 1000);
     </script>
 </body>
 </html>
