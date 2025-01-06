@@ -203,30 +203,42 @@
                     document.getElementById('total-commands').textContent = data.stats.total_commands;
                     document.getElementById('new-games').textContent = data.stats.new_games;
 
-                    // Update charts
-                    Plotly.update('moveChart', {
-                        values: [
-                            data.stats.moves_by_direction.up,
-                            data.stats.moves_by_direction.down,
-                            data.stats.moves_by_direction.left,
-                            data.stats.moves_by_direction.right
-                        ]
+                    // Update moves chart
+                    const moveValues = [
+                        data.stats.moves_by_direction.up || 0,
+                        data.stats.moves_by_direction.down || 0,
+                        data.stats.moves_by_direction.left || 0,
+                        data.stats.moves_by_direction.right || 0
+                    ];
+                    Plotly.restyle('moveChart', {
+                        'values': [moveValues]
                     });
 
-                    Plotly.update('platformChart', {
-                        values: [data.stats.platform_stats.web, data.stats.platform_stats.ios]
+                    // Update platform chart
+                    const platformValues = [
+                        data.stats.platform_stats.web || 0,
+                        data.stats.platform_stats.ios || 0
+                    ];
+                    Plotly.restyle('platformChart', {
+                        'values': [platformValues]
                     });
 
-                    const browserStats = data.stats.browser_stats;
-                    Plotly.update('browserChart', {
-                        values: browserStats.map(item => item[1]),
-                        labels: browserStats.map(item => item[0] || 'Unknown')
+                    // Update browser chart
+                    const browserStats = data.stats.browser_stats || [];
+                    const browserValues = browserStats.map(item => item[1]);
+                    const browserLabels = browserStats.map(item => item[0] || 'Unknown');
+                    Plotly.restyle('browserChart', {
+                        'values': [browserValues],
+                        'labels': [browserLabels]
                     });
 
-                    const deviceStats = data.stats.device_stats;
-                    Plotly.update('deviceChart', {
-                        values: deviceStats.map(item => item[1]),
-                        labels: deviceStats.map(item => item[0] || 'Unknown')
+                    // Update device chart
+                    const deviceStats = data.stats.device_stats || [];
+                    const deviceValues = deviceStats.map(item => item[1]);
+                    const deviceLabels = deviceStats.map(item => item[0] || 'Unknown');
+                    Plotly.restyle('deviceChart', {
+                        'values': [deviceValues],
+                        'labels': [deviceLabels]
                     });
 
                     // Update recent events table
@@ -248,14 +260,9 @@
             }
         }
 
-        // Initial charts setup
+        // Initial charts setup with empty data
         const moveData = {
-            values: [
-                {{ stats.moves_by_direction.up }},
-                {{ stats.moves_by_direction.down }},
-                {{ stats.moves_by_direction.left }},
-                {{ stats.moves_by_direction.right }}
-            ],
+            values: [0, 0, 0, 0],
             labels: ['Up', 'Down', 'Left', 'Right'],
             type: 'pie',
             marker: {
@@ -268,7 +275,7 @@
         });
 
         const platformData = {
-            values: [{{ stats.platform_stats.web }}, {{ stats.platform_stats.ios }}],
+            values: [0, 0],
             labels: ['Web', 'iOS'],
             type: 'pie',
             marker: {
@@ -280,10 +287,9 @@
             margin: { t: 0, b: 0, l: 0, r: 0 }
         });
 
-        const browserStats = {{ stats.browser_stats|tojson }};
         const browserData = {
-            values: browserStats.map(item => item[1]),
-            labels: browserStats.map(item => item[0] || 'Unknown'),
+            values: [0],
+            labels: ['Unknown'],
             type: 'pie',
             marker: {
                 colors: ['#e67e22', '#3498db', '#2ecc71', '#e74c3c', '#f1c40f']
@@ -294,10 +300,9 @@
             margin: { t: 0, b: 0, l: 0, r: 0 }
         });
 
-        const deviceStats = {{ stats.device_stats|tojson }};
         const deviceData = {
-            values: deviceStats.map(item => item[1]),
-            labels: deviceStats.map(item => item[0] || 'Unknown'),
+            values: [0],
+            labels: ['Unknown'],
             type: 'pie',
             marker: {
                 colors: ['#16a085', '#27ae60', '#2980b9', '#8e44ad', '#f39c12']
