@@ -250,7 +250,8 @@ async function trackEvent(eventType, eventData = null) {
             },
             body: JSON.stringify({
                 event_type: eventType,
-                event_data: eventData
+                event_data: eventData,
+                platform: 'web'  // Explicitly set platform for web version
             })
         });
     } catch (error) {

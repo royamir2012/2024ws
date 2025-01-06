@@ -25,6 +25,7 @@ def track_event():
     data = request.json
     event = GameAnalytics(
         ip_address=request.remote_addr,
+        platform=data.get('platform', 'web'),  # Default to 'web' if not specified
         event_type=data.get('event_type'),
         event_data=data.get('event_data')
     )
@@ -45,6 +46,7 @@ def dashboard_data():
         {
             'timestamp': event.timestamp.isoformat(),
             'ip_address': event.ip_address,
+            'platform': event.platform,
             'event_type': event.event_type,
             'event_data': event.event_data
         }

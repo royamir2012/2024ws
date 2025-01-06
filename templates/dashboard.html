@@ -75,6 +75,20 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-body">
+                        <h5 class="card-title">Platform Distribution</h5>
+                        <div class="chart-container">
+                            <canvas id="platformChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
                         <h5 class="card-title">Recent Activity</h5>
                         <div class="table-responsive">
                             <table class="table">
@@ -82,6 +96,7 @@
                                     <tr>
                                         <th>Time</th>
                                         <th>IP</th>
+                                        <th>Platform</th>
                                         <th>Event</th>
                                         <th>Data</th>
                                     </tr>
@@ -91,6 +106,7 @@
                                     <tr>
                                         <td>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                         <td>{{ event.ip_address }}</td>
+                                        <td>{{ event.platform }}</td>
                                         <td>{{ event.event_type }}</td>
                                         <td>{{ event.event_data or '-' }}</td>
                                     </tr>
@@ -105,18 +121,19 @@
     </div>
 
     <script>
-        let moveChart;
+        let moveChart, platformChart;
 
-        // Initialize chart
-        function initializeChart(data) {
-            const ctx = document.getElementById('moveChart').getContext('2d');
-            moveChart = new Chart(ctx, {
+        // Initialize charts
+        function initializeCharts(moveData, platformData) {
+            // Move Distribution Chart
+            const moveCtx = document.getElementById('moveChart').getContext('2d');
+            moveChart = new Chart(moveCtx, {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data),
+                    labels: Object.keys(moveData),
                     datasets: [{
                         label: 'Number of Moves',
-                        data: Object.values(data),
+                        data: Object.values(moveData),
                         backgroundColor: [
                             'rgba(255, 99, 132, 0.5)',
                             'rgba(54, 162, 235, 0.5)',
@@ -142,12 +159,40 @@
                     }
                 }
             });
+
+            // Platform Distribution Chart
+            const platformCtx = document.getElementById('platformChart').getContext('2d');
+            platformChart = new Chart(platformCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Web', 'iOS'],
+                    datasets: [{
+                        data: [platformData.web, platformData.ios],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.5)',
+                            'rgba(255, 99, 132, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
         }
 
-        // Update chart data
-        function updateChart(data) {
-            moveChart.data.datasets[0].data = Object.values(data);
+        // Update charts
+        function updateCharts(moveData, platformData) {
+            moveChart.data.datasets[0].data = Object.values(moveData);
             moveChart.update();
+
+            platformChart.data.datasets[0].data = [platformData.web, platformData.ios];
+            platformChart.update();
         }
 
         // Format timestamp
@@ -164,14 +209,15 @@
             document.getElementById('avg-moves').textContent = 
                 (data.stats.new_games > 0 ? (data.stats.total_commands / data.stats.new_games).toFixed(1) : '0.0');
 
-            // Update move distribution chart
-            updateChart(data.stats.moves_by_direction);
+            // Update charts
+            updateCharts(data.stats.moves_by_direction, data.stats.platform_stats);
 
             // Update recent events table
             const recentEventsHtml = data.recent_events.map(event => `
                 <tr>
                     <td>${formatTimestamp(event.timestamp)}</td>
                     <td>${event.ip_address}</td>
+                    <td>${event.platform}</td>
                     <td>${event.event_type}</td>
                     <td>${event.event_data || '-'}</td>
                 </tr>
@@ -190,8 +236,8 @@
             }
         }
 
-        // Initialize chart with initial data
-        initializeChart({{ stats.moves_by_direction | tojson }});
+        // Initialize charts with initial data
+        initializeCharts({{ stats.moves_by_direction | tojson }}, {{ stats.platform_stats | tojson }});
 
         // Update dashboard every second
         setInterval(fetchDashboardData, 1000);
