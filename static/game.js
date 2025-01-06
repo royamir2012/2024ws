@@ -1,19 +1,117 @@
 class Game2048 {
     constructor() {
         this.grid = Array(4).fill().map(() => Array(4).fill(0));
-        this.score = 0;
-        this.bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
-        this.achievedScores = new Set();
         this.gameOver = false;
-        this.highestTileAchieved = 0;
+        this.currentHighestInGame = 0;
+        this.startTime = null;
+        this.timerInterval = null;
+        this.setupHighScoreUpdates();
+        this.fetchGlobalHigh();
         this.initializeGame();
         this.setupControls();
     }
 
+    setupHighScoreUpdates() {
+        const eventSource = new EventSource('/high-score-updates');
+        
+        eventSource.onmessage = async (event) => {
+            if (event.data === 'update') {
+                // Refresh our high scores
+                await this.fetchGlobalHigh();
+            }
+        };
+
+        eventSource.onerror = (error) => {
+            console.error('SSE Error:', error);
+            eventSource.close();
+            // Try to reconnect after 5 seconds
+            setTimeout(() => this.setupHighScoreUpdates(), 5000);
+        };
+
+        // Clean up EventSource when the window is closed
+        window.addEventListener('beforeunload', () => {
+            eventSource.close();
+        });
+    }
+
+    async fetchGlobalHigh() {
+        try {
+            const response = await fetch('/global-high');
+            const data = await response.json();
+            if (data.status === 'success') {
+                this.highestNumber = data.highest_number;
+                this.bestTimeForHighest = data.best_time;
+                this.updateDisplays();
+            }
+        } catch (error) {
+            console.error('Error fetching global high score:', error);
+        }
+    }
+
+    async updateGlobalHigh(number, time) {
+        try {
+            const response = await fetch('/update-global-high', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ number, time })
+            });
+            const data = await response.json();
+            if (data.status === 'success' && data.message !== 'No new record') {
+                // Refresh global high scores
+                await this.fetchGlobalHigh();
+            }
+        } catch (error) {
+            console.error('Error updating global high score:', error);
+        }
+    }
+
+    updateHighestNumber(number) {
+        this.currentHighestInGame = Math.max(this.currentHighestInGame, number);
+        const currentTime = Math.floor((Date.now() - this.startTime) / 1000);
+        
+        if (number >= this.highestNumber) {
+            this.updateGlobalHigh(number, currentTime);
+        }
+    }
+
+    updateDisplays() {
+        document.getElementById('highest-number').textContent = this.highestNumber || 0;
+        document.getElementById('best-time').textContent = this.formatTime(this.bestTimeForHighest);
+    }
+
     initializeGame() {
+        this.grid = Array(4).fill().map(() => Array(4).fill(0));
+        this.gameOver = false;
+        this.currentHighestInGame = 0;
         this.addNewTile();
         this.addNewTile();
         this.updateGrid();
+        this.startTimer();
+        trackEvent('new_game');
+    }
+
+    startTimer() {
+        // Clear existing timer if any
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+        }
+        
+        // Set start time
+        this.startTime = Date.now();
+        
+        // Update timer every second
+        this.timerInterval = setInterval(() => {
+            if (!this.gameOver) {
+                const currentTime = Date.now();
+                const elapsedTime = Math.floor((currentTime - this.startTime) / 1000);
+                const minutes = Math.floor(elapsedTime / 60);
+                const seconds = elapsedTime % 60;
+                document.getElementById('timer').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }, 1000);
     }
 
     setupControls() {
@@ -24,73 +122,169 @@ class Game2048 {
             let moved = false;
             switch(event.key) {
                 case 'ArrowUp':
-                    moved = this.moveUp();
-                    if (moved) trackEvent('move', 'up');
+                    moved = this.move('up');
                     break;
                 case 'ArrowDown':
-                    moved = this.moveDown();
-                    if (moved) trackEvent('move', 'down');
+                    moved = this.move('down');
                     break;
                 case 'ArrowLeft':
-                    moved = this.moveLeft();
-                    if (moved) trackEvent('move', 'left');
+                    moved = this.move('left');
                     break;
                 case 'ArrowRight':
-                    moved = this.moveRight();
-                    if (moved) trackEvent('move', 'right');
+                    moved = this.move('right');
                     break;
+                default:
+                    return;
             }
             
             if (moved) {
                 this.addNewTile();
                 this.updateGrid();
                 this.checkGameOver();
-                this.saveGameState();
             }
         });
 
         // Touch controls
-        if ('ontouchstart' in window) {
-            this.setupTouchControls();
-        }
-    }
-
-    setupTouchControls() {
         const touchAreas = document.querySelectorAll('.touch-area');
         touchAreas.forEach(area => {
             area.addEventListener('click', (event) => {
                 if (this.gameOver) return;
                 
-                const direction = event.target.dataset.direction;
-                let moved = false;
-                
-                switch(direction) {
-                    case 'up':
-                        moved = this.moveUp();
-                        if (moved) trackEvent('move', 'up');
-                        break;
-                    case 'down':
-                        moved = this.moveDown();
-                        if (moved) trackEvent('move', 'down');
-                        break;
-                    case 'left':
-                        moved = this.moveLeft();
-                        if (moved) trackEvent('move', 'left');
-                        break;
-                    case 'right':
-                        moved = this.moveRight();
-                        if (moved) trackEvent('move', 'right');
-                        break;
-                }
-                
-                if (moved) {
+                const direction = area.dataset.direction;
+                if (this.move(direction)) {
                     this.addNewTile();
                     this.updateGrid();
                     this.checkGameOver();
-                    this.saveGameState();
                 }
             });
         });
+
+        // New game button
+        document.getElementById('new-game').addEventListener('click', () => {
+            this.initializeGame();
+        });
+    }
+
+    move(direction) {
+        let moved = false;
+        const oldGrid = JSON.stringify(this.grid);
+
+        switch(direction) {
+            case 'up':
+                moved = this.moveUp();
+                if (moved) trackEvent('move', 'up');
+                break;
+            case 'down':
+                moved = this.moveDown();
+                if (moved) trackEvent('move', 'down');
+                break;
+            case 'left':
+                moved = this.moveLeft();
+                if (moved) trackEvent('move', 'left');
+                break;
+            case 'right':
+                moved = this.moveRight();
+                if (moved) trackEvent('move', 'right');
+                break;
+        }
+
+        return moved;
+    }
+
+    moveLeft() {
+        let moved = false;
+        for (let i = 0; i < 4; i++) {
+            let row = this.grid[i].filter(cell => cell !== 0);
+            for (let j = 0; j < row.length - 1; j++) {
+                if (row[j] === row[j + 1]) {
+                    row[j] *= 2;
+                    this.updateHighestNumber(row[j]);
+                    row.splice(j + 1, 1);
+                }
+            }
+            const newRow = row.concat(Array(4 - row.length).fill(0));
+            if (JSON.stringify(this.grid[i]) !== JSON.stringify(newRow)) {
+                moved = true;
+            }
+            this.grid[i] = newRow;
+        }
+        return moved;
+    }
+
+    moveRight() {
+        let moved = false;
+        for (let i = 0; i < 4; i++) {
+            let row = this.grid[i].filter(cell => cell !== 0);
+            for (let j = row.length - 1; j > 0; j--) {
+                if (row[j] === row[j - 1]) {
+                    row[j] *= 2;
+                    this.updateHighestNumber(row[j]);
+                    row.splice(j - 1, 1);
+                    j--;
+                }
+            }
+            const newRow = Array(4 - row.length).fill(0).concat(row);
+            if (JSON.stringify(this.grid[i]) !== JSON.stringify(newRow)) {
+                moved = true;
+            }
+            this.grid[i] = newRow;
+        }
+        return moved;
+    }
+
+    moveUp() {
+        let moved = false;
+        for (let j = 0; j < 4; j++) {
+            let column = [];
+            for (let i = 0; i < 4; i++) {
+                if (this.grid[i][j] !== 0) {
+                    column.push(this.grid[i][j]);
+                }
+            }
+            for (let i = 0; i < column.length - 1; i++) {
+                if (column[i] === column[i + 1]) {
+                    column[i] *= 2;
+                    this.updateHighestNumber(column[i]);
+                    column.splice(i + 1, 1);
+                }
+            }
+            const newColumn = column.concat(Array(4 - column.length).fill(0));
+            for (let i = 0; i < 4; i++) {
+                if (this.grid[i][j] !== newColumn[i]) {
+                    moved = true;
+                }
+                this.grid[i][j] = newColumn[i];
+            }
+        }
+        return moved;
+    }
+
+    moveDown() {
+        let moved = false;
+        for (let j = 0; j < 4; j++) {
+            let column = [];
+            for (let i = 0; i < 4; i++) {
+                if (this.grid[i][j] !== 0) {
+                    column.push(this.grid[i][j]);
+                }
+            }
+            for (let i = column.length - 1; i > 0; i--) {
+                if (column[i] === column[i - 1]) {
+                    column[i] *= 2;
+                    this.updateHighestNumber(column[i]);
+                    column.splice(i - 1, 1);
+                    i--;
+                }
+            }
+            const newColumn = Array(4 - column.length).fill(0).concat(column);
+            for (let i = 0; i < 4; i++) {
+                if (this.grid[i][j] !== newColumn[i]) {
+                    moved = true;
+                }
+                this.grid[i][j] = newColumn[i];
+            }
+        }
+        return moved;
     }
 
     addNewTile() {
@@ -124,235 +318,55 @@ class Game2048 {
             }
         }
 
-        document.getElementById('score').textContent = this.score;
-        document.getElementById('best-score').textContent = this.bestScore;
+        // Update displays
+        this.updateDisplays();
     }
 
-    move(direction) {
-        let moved = false;
-        const oldGrid = JSON.stringify(this.grid);
-
-        switch(direction) {
-            case 'up': moved = this.moveUp(); break;
-            case 'down': moved = this.moveDown(); break;
-            case 'left': moved = this.moveLeft(); break;
-            case 'right': moved = this.moveRight(); break;
-        }
-
-        if (moved) {
-            this.addNewTile();
-            this.updateGrid();
-            
-            if (this.score > this.bestScore) {
-                this.bestScore = this.score;
-                localStorage.setItem('bestScore', this.bestScore);
-            }
-
-            this.checkGameOver();
-            this.saveGameState();
-            trackEvent('move', direction);
+    stopTimer() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
         }
     }
 
-    moveLeft() {
-        let moved = false;
-        for (let i = 0; i < 4; i++) {
-            let row = this.grid[i].filter(cell => cell !== 0);
-            for (let j = 0; j < row.length - 1; j++) {
-                if (row[j] === row[j + 1]) {
-                    row[j] *= 2;
-                    this.score += row[j];
-                    this.checkAchievement(row[j]);
-                    row.splice(j + 1, 1);
-                }
-            }
-            const newRow = row.concat(Array(4 - row.length).fill(0));
-            if (JSON.stringify(this.grid[i]) !== JSON.stringify(newRow)) {
-                moved = true;
-            }
-            this.grid[i] = newRow;
-        }
-        return moved;
-    }
-
-    moveRight() {
-        let moved = false;
-        for (let i = 0; i < 4; i++) {
-            let row = this.grid[i].filter(cell => cell !== 0);
-            for (let j = row.length - 1; j > 0; j--) {
-                if (row[j] === row[j - 1]) {
-                    row[j] *= 2;
-                    this.score += row[j];
-                    this.checkAchievement(row[j]);
-                    row.splice(j - 1, 1);
-                    j--;
-                }
-            }
-            const newRow = Array(4 - row.length).fill(0).concat(row);
-            if (JSON.stringify(this.grid[i]) !== JSON.stringify(newRow)) {
-                moved = true;
-            }
-            this.grid[i] = newRow;
-        }
-        return moved;
-    }
-
-    moveUp() {
-        let moved = false;
-        for (let j = 0; j < 4; j++) {
-            let column = [];
-            for (let i = 0; i < 4; i++) {
-                if (this.grid[i][j] !== 0) {
-                    column.push(this.grid[i][j]);
-                }
-            }
-            for (let i = 0; i < column.length - 1; i++) {
-                if (column[i] === column[i + 1]) {
-                    column[i] *= 2;
-                    this.score += column[i];
-                    this.checkAchievement(column[i]);
-                    column.splice(i + 1, 1);
-                }
-            }
-            column = column.concat(Array(4 - column.length).fill(0));
-            for (let i = 0; i < 4; i++) {
-                if (this.grid[i][j] !== column[i]) {
-                    moved = true;
-                }
-                this.grid[i][j] = column[i];
-            }
-        }
-        return moved;
-    }
-
-    moveDown() {
-        let moved = false;
-        for (let j = 0; j < 4; j++) {
-            let column = [];
-            for (let i = 0; i < 4; i++) {
-                if (this.grid[i][j] !== 0) {
-                    column.push(this.grid[i][j]);
-                }
-            }
-            for (let i = column.length - 1; i > 0; i--) {
-                if (column[i] === column[i - 1]) {
-                    column[i] *= 2;
-                    this.score += column[i];
-                    this.checkAchievement(column[i]);
-                    column.splice(i - 1, 1);
-                    i--;
-                }
-            }
-            column = Array(4 - column.length).fill(0).concat(column);
-            for (let i = 0; i < 4; i++) {
-                if (this.grid[i][j] !== column[i]) {
-                    moved = true;
-                }
-                this.grid[i][j] = column[i];
-            }
-        }
-        return moved;
-    }
-
-    checkAchievement(value) {
-        if ((value === 8 || value === 16) && !this.achievedScores.has(value)) {
-            this.achievedScores.add(value);
-            this.playAchievement();
-            this.showConfetti();
-            trackEvent('achievement', value.toString());
-        }
-    }
-
-    playAchievement() {
-        const sound = document.getElementById('achievement-sound');
-        sound.currentTime = 0;
-        sound.play();
-    }
-
-    showConfetti() {
-        confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 }
-        });
+    formatTime(seconds) {
+        if (!seconds) return '--:--';
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
 
     checkGameOver() {
-        // Check for any empty cells
         for (let i = 0; i < 4; i++) {
             for (let j = 0; j < 4; j++) {
-                if (this.grid[i][j] === 0) return;
-            }
-        }
-
-        // Check for any possible merges
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                if (
-                    (i < 3 && this.grid[i][j] === this.grid[i + 1][j]) ||
-                    (j < 3 && this.grid[i][j] === this.grid[i][j + 1])
-                ) {
-                    return;
-                }
+                if (this.grid[i][j] === 0) return false;
+                if (i < 3 && this.grid[i][j] === this.grid[i + 1][j]) return false;
+                if (j < 3 && this.grid[i][j] === this.grid[i][j + 1]) return false;
             }
         }
         this.gameOver = true;
-        trackEvent('game_over', this.score.toString());
-    }
-
-    getHighestTile() {
-        let highestTile = 0;
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                if (this.grid[i][j] > highestTile) {
-                    highestTile = this.grid[i][j];
-                }
-            }
-        }
-        return highestTile;
-    }
-
-    saveGameState() {
-        localStorage.setItem('gameState', JSON.stringify(this.grid));
-        localStorage.setItem('score', this.score);
+        this.stopTimer();
+        
+        return true;
     }
 }
 
 // Track game events
-async function trackEvent(eventType, eventData) {
-    try {
-        const response = await fetch('/track', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                event_type: eventType,
-                event_data: eventData,
-                platform: 'web'
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Error tracking event:', errorData.message);
-            return false;
-        }
-
-        return true;
-    } catch (error) {
-        console.error('Error tracking event:', error);
-        return false;
-    }
+function trackEvent(eventType, eventData) {
+    fetch('/track', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            event_type: eventType,
+            event_data: eventData,
+            platform: 'web'
+        })
+    }).catch(error => console.error('Error tracking event:', error));
 }
 
 // Initialize game
 document.addEventListener('DOMContentLoaded', () => {
     let game = new Game2048();
-
-    // New game button
-    document.getElementById('new-game').addEventListener('click', () => {
-        trackEvent('new_game');
-        game = new Game2048();
-    });
 });

@@ -46,3 +46,19 @@ class GameAnalytics(db.Model):
             ]
         }
         return stats
+
+class GlobalHighScore(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    highest_number = db.Column(db.Integer, default=0)
+    best_time = db.Column(db.Integer)  # in seconds
+    achieved_by = db.Column(db.String(50))  # IP address of the achiever
+    achieved_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    @staticmethod
+    def get_current():
+        record = GlobalHighScore.query.order_by(GlobalHighScore.highest_number.desc(), GlobalHighScore.best_time.asc()).first()
+        if not record:
+            record = GlobalHighScore(highest_number=0, best_time=None)
+            db.session.add(record)
+            db.session.commit()
+        return record
