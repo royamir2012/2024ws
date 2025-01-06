@@ -319,9 +319,9 @@ class Game2048 {
 }
 
 // Track game events
-async function trackEvent(eventType, eventData = null) {
+async function trackEvent(eventType, eventData) {
     try {
-        await fetch('/track', {
+        const response = await fetch('/track', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -329,11 +329,20 @@ async function trackEvent(eventType, eventData = null) {
             body: JSON.stringify({
                 event_type: eventType,
                 event_data: eventData,
-                platform: 'web'  // Explicitly set platform for web version
+                platform: 'web'
             })
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Error tracking event:', errorData.message);
+            return false;
+        }
+
+        return true;
     } catch (error) {
         console.error('Error tracking event:', error);
+        return false;
     }
 }
 
