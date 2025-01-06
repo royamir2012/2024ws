@@ -8,6 +8,8 @@ class GameAnalytics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ip_address = db.Column(db.String(45), nullable=False)
     platform = db.Column(db.String(20), nullable=False, default='web')  # 'web' or 'ios'
+    browser = db.Column(db.String(100))  # Store browser information
+    device_type = db.Column(db.String(100))  # Store device type (mobile, tablet, desktop, etc.)
     event_type = db.Column(db.String(50), nullable=False)  # 'move', 'new_game'
     event_data = db.Column(db.String(50))  # 'up', 'down', 'left', 'right' for moves
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
@@ -27,6 +29,20 @@ class GameAnalytics(db.Model):
             'platform_stats': {
                 'web': db.session.query(func.count(GameAnalytics.id)).filter(GameAnalytics.platform == 'web').scalar(),
                 'ios': db.session.query(func.count(GameAnalytics.id)).filter(GameAnalytics.platform == 'ios').scalar()
-            }
+            },
+            'browser_stats': [
+                [str(row[0] or 'Unknown'), row[1]]
+                for row in db.session.query(GameAnalytics.browser, func.count(GameAnalytics.id))
+                .filter(GameAnalytics.browser.isnot(None))
+                .group_by(GameAnalytics.browser)
+                .all()
+            ],
+            'device_stats': [
+                [str(row[0] or 'Unknown'), row[1]]
+                for row in db.session.query(GameAnalytics.device_type, func.count(GameAnalytics.id))
+                .filter(GameAnalytics.device_type.isnot(None))
+                .group_by(GameAnalytics.device_type)
+                .all()
+            ]
         }
         return stats

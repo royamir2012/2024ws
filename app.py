@@ -4,6 +4,7 @@ from models import db, GameAnalytics
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+from user_agents import parse
 
 app = Flask(__name__)
 CORS(app)
@@ -48,34 +49,52 @@ def index():
 @app.route('/track', methods=['POST'])
 def track_event():
     try:
-        data = request.json
-        app.logger.info(f'Received tracking data: {data}')
+        data = request.get_json()
         
-        if not data:
-            app.logger.error('No JSON data received')
-            return jsonify({'status': 'error', 'message': 'No data received'}), 400
+        # Get IP address
+        if request.headers.getlist("X-Forwarded-For"):
+            ip_address = request.headers.getlist("X-Forwarded-For")[0]
+        else:
+            ip_address = request.remote_addr
+            
+        # Get User-Agent string
+        user_agent_string = request.headers.get('User-Agent')
         
-        # Get the real IP address, considering proxy headers
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if ip_address:
-            ip_address = ip_address.split(',')[0].strip()
+        # Parse User-Agent for detailed device information
+        user_agent = parse(user_agent_string)
         
+        # Determine device type
+        if user_agent.is_mobile:
+            device_type = f"Mobile ({user_agent.device.brand} {user_agent.device.model})"
+        elif user_agent.is_tablet:
+            device_type = f"Tablet ({user_agent.device.brand} {user_agent.device.model})"
+        else:
+            os_info = user_agent.os.family
+            if "Mac" in os_info:
+                device_type = "Mac"
+            elif "Windows" in os_info:
+                device_type = "PC"
+            elif "iOS" in os_info:
+                device_type = "iPad"
+            else:
+                device_type = f"Desktop ({os_info})"
+            
+        # Create analytics event
         event = GameAnalytics(
             ip_address=ip_address,
-            platform=data.get('platform', 'web'),
             event_type=data.get('event_type'),
-            event_data=data.get('event_data')
+            event_data=data.get('event_data'),
+            platform=data.get('platform', 'web'),
+            browser=user_agent.browser.family,
+            device_type=device_type
         )
         
         db.session.add(event)
         db.session.commit()
-        app.logger.info(f'Successfully tracked event from IP: {ip_address}')
         
         return jsonify({'status': 'success'})
-        
     except Exception as e:
-        app.logger.error(f'Error in track_event: {str(e)}')
-        db.session.rollback()
+        app.logger.error(f'Error tracking event: {str(e)}')
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/dashboard')
@@ -92,22 +111,24 @@ def dashboard():
 def dashboard_data():
     try:
         stats = GameAnalytics.get_stats()
-        recent_events = [
-            {
-                'timestamp': event.timestamp.isoformat(),
-                'ip_address': event.ip_address,
-                'platform': event.platform,
-                'event_type': event.event_type,
-                'event_data': event.event_data
-            }
-            for event in GameAnalytics.query.order_by(GameAnalytics.timestamp.desc()).limit(10).all()
-        ]
+        recent_events = db.session.query(GameAnalytics).order_by(GameAnalytics.timestamp.desc()).limit(10).all()
+        recent_events_data = [{
+            'timestamp': event.timestamp.isoformat(),
+            'ip_address': event.ip_address,
+            'platform': event.platform,
+            'event_type': event.event_type,
+            'event_data': event.event_data,
+            'browser': event.browser,
+            'device_type': event.device_type
+        } for event in recent_events]
+        
         return jsonify({
+            'status': 'success',
             'stats': stats,
-            'recent_events': recent_events
+            'recent_events': recent_events_data
         })
     except Exception as e:
-        app.logger.error(f'Error in dashboard_data: {str(e)}')
+        app.logger.error(f'Error in dashboard: {str(e)}')
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.errorhandler(500)
