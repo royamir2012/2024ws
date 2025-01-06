@@ -5,11 +5,14 @@
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background-color: #faf8ef;
-    display: flex;
-    justify-content: center;
+    background-color: #ffffff;
+    margin: 0;
     padding: 20px;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
 }
 
 .container {
@@ -39,7 +42,7 @@ h1 {
 }
 
 .game-container {
-    background: #bbada0;
+    background-color: #bbada0;
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 20px;

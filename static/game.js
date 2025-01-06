@@ -4,6 +4,8 @@ class Game2048 {
         this.score = 0;
         this.bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
         this.achievedScores = new Set();
+        this.gameOver = false;
+        this.highestTileAchieved = 0;
         this.init();
     }
 
@@ -68,9 +70,9 @@ class Game2048 {
                 localStorage.setItem('bestScore', this.bestScore);
             }
 
-            if (this.isGameOver()) {
-                alert('Game Over!');
-            }
+            this.checkGameOver();
+            this.saveGameState();
+            trackEvent('move', direction);
         }
     }
 
@@ -179,6 +181,7 @@ class Game2048 {
             this.achievedScores.add(value);
             this.playAchievement();
             this.showConfetti();
+            trackEvent('achievement', value.toString());
         }
     }
 
@@ -196,11 +199,11 @@ class Game2048 {
         });
     }
 
-    isGameOver() {
+    checkGameOver() {
         // Check for any empty cells
         for (let i = 0; i < 4; i++) {
             for (let j = 0; j < 4; j++) {
-                if (this.grid[i][j] === 0) return false;
+                if (this.grid[i][j] === 0) return;
             }
         }
 
@@ -211,11 +214,47 @@ class Game2048 {
                     (i < 3 && this.grid[i][j] === this.grid[i + 1][j]) ||
                     (j < 3 && this.grid[i][j] === this.grid[i][j + 1])
                 ) {
-                    return false;
+                    return;
                 }
             }
         }
-        return true;
+        this.gameOver = true;
+        trackEvent('game_over', this.score.toString());
+    }
+
+    getHighestTile() {
+        let highestTile = 0;
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                if (this.grid[i][j] > highestTile) {
+                    highestTile = this.grid[i][j];
+                }
+            }
+        }
+        return highestTile;
+    }
+
+    saveGameState() {
+        localStorage.setItem('gameState', JSON.stringify(this.grid));
+        localStorage.setItem('score', this.score);
+    }
+}
+
+// Track game events
+async function trackEvent(eventType, eventData = null) {
+    try {
+        await fetch('/track', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                event_type: eventType,
+                event_data: eventData
+            })
+        });
+    } catch (error) {
+        console.error('Error tracking event:', error);
     }
 }
 
@@ -225,28 +264,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
+        if (game.gameOver) return;
+        
+        let moved = false;
         switch(e.key) {
             case 'ArrowUp': 
                 e.preventDefault();
-                game.move('up'); 
+                moved = game.move('up'); 
                 break;
             case 'ArrowDown': 
                 e.preventDefault();
-                game.move('down'); 
+                moved = game.move('down'); 
                 break;
             case 'ArrowLeft': 
                 e.preventDefault();
-                game.move('left'); 
+                moved = game.move('left'); 
                 break;
             case 'ArrowRight': 
                 e.preventDefault();
-                game.move('right'); 
+                moved = game.move('right'); 
                 break;
+        }
+        
+        if (moved) {
+            game.addNewTile();
+            game.updateGrid();
+            game.checkGameOver();
+            game.saveGameState();
         }
     });
 
     // New game button
     document.getElementById('new-game').addEventListener('click', () => {
+        trackEvent('new_game');
         game = new Game2048();
     });
 
