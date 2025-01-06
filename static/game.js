@@ -6,13 +6,91 @@ class Game2048 {
         this.achievedScores = new Set();
         this.gameOver = false;
         this.highestTileAchieved = 0;
-        this.init();
+        this.initializeGame();
+        this.setupControls();
     }
 
-    init() {
+    initializeGame() {
         this.addNewTile();
         this.addNewTile();
         this.updateGrid();
+    }
+
+    setupControls() {
+        // Keyboard controls
+        document.addEventListener('keydown', (event) => {
+            if (this.gameOver) return;
+            
+            let moved = false;
+            switch(event.key) {
+                case 'ArrowUp':
+                    moved = this.moveUp();
+                    if (moved) trackEvent('move', 'up');
+                    break;
+                case 'ArrowDown':
+                    moved = this.moveDown();
+                    if (moved) trackEvent('move', 'down');
+                    break;
+                case 'ArrowLeft':
+                    moved = this.moveLeft();
+                    if (moved) trackEvent('move', 'left');
+                    break;
+                case 'ArrowRight':
+                    moved = this.moveRight();
+                    if (moved) trackEvent('move', 'right');
+                    break;
+            }
+            
+            if (moved) {
+                this.addNewTile();
+                this.updateGrid();
+                this.checkGameOver();
+                this.saveGameState();
+            }
+        });
+
+        // Touch controls
+        if ('ontouchstart' in window) {
+            this.setupTouchControls();
+        }
+    }
+
+    setupTouchControls() {
+        const touchAreas = document.querySelectorAll('.touch-area');
+        touchAreas.forEach(area => {
+            area.addEventListener('click', (event) => {
+                if (this.gameOver) return;
+                
+                const direction = event.target.dataset.direction;
+                let moved = false;
+                
+                switch(direction) {
+                    case 'up':
+                        moved = this.moveUp();
+                        if (moved) trackEvent('move', 'up');
+                        break;
+                    case 'down':
+                        moved = this.moveDown();
+                        if (moved) trackEvent('move', 'down');
+                        break;
+                    case 'left':
+                        moved = this.moveLeft();
+                        if (moved) trackEvent('move', 'left');
+                        break;
+                    case 'right':
+                        moved = this.moveRight();
+                        if (moved) trackEvent('move', 'right');
+                        break;
+                }
+                
+                if (moved) {
+                    this.addNewTile();
+                    this.updateGrid();
+                    this.checkGameOver();
+                    this.saveGameState();
+                }
+            });
+        });
     }
 
     addNewTile() {
@@ -263,72 +341,9 @@ async function trackEvent(eventType, eventData = null) {
 document.addEventListener('DOMContentLoaded', () => {
     let game = new Game2048();
 
-    // Keyboard controls
-    document.addEventListener('keydown', (e) => {
-        if (game.gameOver) return;
-        
-        let moved = false;
-        switch(e.key) {
-            case 'ArrowUp': 
-                e.preventDefault();
-                moved = game.move('up'); 
-                break;
-            case 'ArrowDown': 
-                e.preventDefault();
-                moved = game.move('down'); 
-                break;
-            case 'ArrowLeft': 
-                e.preventDefault();
-                moved = game.move('left'); 
-                break;
-            case 'ArrowRight': 
-                e.preventDefault();
-                moved = game.move('right'); 
-                break;
-        }
-        
-        if (moved) {
-            game.addNewTile();
-            game.updateGrid();
-            game.checkGameOver();
-            game.saveGameState();
-        }
-    });
-
     // New game button
     document.getElementById('new-game').addEventListener('click', () => {
         trackEvent('new_game');
         game = new Game2048();
-    });
-
-    // Touch controls
-    let touchStartX = 0;
-    let touchStartY = 0;
-
-    document.addEventListener('touchstart', (e) => {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-    });
-
-    document.addEventListener('touchend', (e) => {
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
-        
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            if (deltaX > 0) {
-                game.move('right');
-            } else {
-                game.move('left');
-            }
-        } else {
-            if (deltaY > 0) {
-                game.move('down');
-            } else {
-                game.move('up');
-            }
-        }
     });
 });

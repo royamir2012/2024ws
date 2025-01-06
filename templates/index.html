@@ -4,24 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2048 Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>2048</h1>
-        <div class="score-container">
-            <div class="score">Score: <span id="score">0</span></div>
-            <div class="best">Best: <span id="best-score">0</span></div>
+        <div class="header">
+            <div class="scores-container">
+                <div class="score-box">
+                    <span class="score-label">SCORE</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="score-box">
+                    <span class="score-label">BEST</span>
+                    <span id="best-score">0</span>
+                </div>
+            </div>
+            <div class="game-intro">
+                <button id="new-game">New Game</button>
+            </div>
         </div>
+        
         <div class="game-container">
             <div class="grid-container" id="grid-container"></div>
         </div>
-        <button id="new-game">New Game</button>
+
+        <!-- Touch Controls -->
+        <div class="touch-controls">
+            <div class="touch-area touch-up" data-direction="up">
+                <i class="fas fa-chevron-up"></i>
+            </div>
+            <div class="touch-area touch-down" data-direction="down">
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="touch-area touch-left" data-direction="left">
+                <i class="fas fa-chevron-left"></i>
+            </div>
+            <div class="touch-area touch-right" data-direction="right">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
+
         <div class="instructions">
             <p>Use arrow keys or swipe to move tiles. Join similar numbers to get to 2048!</p>
         </div>
     </div>
+    
     <audio id="achievement-sound" src="{{ url_for('static', filename='achievement.mp3') }}" preload="auto"></audio>
     <script src="{{ url_for('static', filename='game.js') }}"></script>
 </body>
