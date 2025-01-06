@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2048 Game</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -21,6 +22,7 @@
             <p>Use arrow keys or swipe to move tiles. Join similar numbers to get to 2048!</p>
         </div>
     </div>
+    <audio id="achievement-sound" src="{{ url_for('static', filename='achievement.mp3') }}" preload="auto"></audio>
     <script src="{{ url_for('static', filename='game.js') }}"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@ class Game2048 {
         this.grid = Array(4).fill().map(() => Array(4).fill(0));
         this.score = 0;
         this.bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
+        this.achievedScores = new Set();
         this.init();
     }
 
@@ -81,6 +82,7 @@ class Game2048 {
                 if (row[j] === row[j + 1]) {
                     row[j] *= 2;
                     this.score += row[j];
+                    this.checkAchievement(row[j]);
                     row.splice(j + 1, 1);
                 }
             }
@@ -101,6 +103,7 @@ class Game2048 {
                 if (row[j] === row[j - 1]) {
                     row[j] *= 2;
                     this.score += row[j];
+                    this.checkAchievement(row[j]);
                     row.splice(j - 1, 1);
                     j--;
                 }
@@ -127,6 +130,7 @@ class Game2048 {
                 if (column[i] === column[i + 1]) {
                     column[i] *= 2;
                     this.score += column[i];
+                    this.checkAchievement(column[i]);
                     column.splice(i + 1, 1);
                 }
             }
@@ -154,6 +158,7 @@ class Game2048 {
                 if (column[i] === column[i - 1]) {
                     column[i] *= 2;
                     this.score += column[i];
+                    this.checkAchievement(column[i]);
                     column.splice(i - 1, 1);
                     i--;
                 }
@@ -167,6 +172,28 @@ class Game2048 {
             }
         }
         return moved;
+    }
+
+    checkAchievement(value) {
+        if ((value === 8 || value === 16) && !this.achievedScores.has(value)) {
+            this.achievedScores.add(value);
+            this.playAchievement();
+            this.showConfetti();
+        }
+    }
+
+    playAchievement() {
+        const sound = document.getElementById('achievement-sound');
+        sound.currentTime = 0;
+        sound.play();
+    }
+
+    showConfetti() {
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
     }
 
     isGameOver() {
