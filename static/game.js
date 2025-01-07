@@ -9,6 +9,8 @@ class Game2048 {
         this.fetchGlobalHigh();
         this.initializeGame();
         this.setupControls();
+        this.touchStartX = null;
+        this.touchStartY = null;
     }
 
     setupHighScoreUpdates() {
@@ -119,47 +121,73 @@ class Game2048 {
         document.addEventListener('keydown', (event) => {
             if (this.gameOver) return;
             
-            let moved = false;
             switch(event.key) {
                 case 'ArrowUp':
-                    moved = this.move('up');
+                    this.move('up');
                     break;
                 case 'ArrowDown':
-                    moved = this.move('down');
+                    this.move('down');
                     break;
                 case 'ArrowLeft':
-                    moved = this.move('left');
+                    this.move('left');
                     break;
                 case 'ArrowRight':
-                    moved = this.move('right');
+                    this.move('right');
                     break;
-                default:
-                    return;
-            }
-            
-            if (moved) {
-                this.addNewTile();
-                this.updateGrid();
-                this.checkGameOver();
             }
         });
 
         // Touch controls
-        const touchAreas = document.querySelectorAll('.touch-area');
-        touchAreas.forEach(area => {
-            area.addEventListener('click', (event) => {
-                if (this.gameOver) return;
-                
-                const direction = area.dataset.direction;
-                if (this.move(direction)) {
-                    this.addNewTile();
-                    this.updateGrid();
-                    this.checkGameOver();
-                }
-            });
-        });
+        const gridContainer = document.getElementById('grid-container');
+        
+        gridContainer.addEventListener('touchstart', (e) => {
+            this.touchStartX = e.touches[0].clientX;
+            this.touchStartY = e.touches[0].clientY;
+            e.preventDefault(); // Prevent scrolling
+        }, { passive: false });
 
-        // New game button
+        gridContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Prevent scrolling
+        }, { passive: false });
+
+        gridContainer.addEventListener('touchend', (e) => {
+            if (!this.touchStartX || !this.touchStartY || this.gameOver) return;
+
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const deltaX = touchEndX - this.touchStartX;
+            const deltaY = touchEndY - this.touchStartY;
+
+            // Minimum swipe distance to trigger a move
+            const minSwipeDistance = 30;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                if (Math.abs(deltaX) > minSwipeDistance) {
+                    if (deltaX > 0) {
+                        this.move('right');
+                    } else {
+                        this.move('left');
+                    }
+                }
+            } else {
+                // Vertical swipe
+                if (Math.abs(deltaY) > minSwipeDistance) {
+                    if (deltaY > 0) {
+                        this.move('down');
+                    } else {
+                        this.move('up');
+                    }
+                }
+            }
+
+            this.touchStartX = null;
+            this.touchStartY = null;
+            e.preventDefault();
+        }, { passive: false });
+
+        // New Game button
         document.getElementById('new-game').addEventListener('click', () => {
             this.initializeGame();
         });
@@ -188,7 +216,11 @@ class Game2048 {
                 break;
         }
 
-        return moved;
+        if (moved) {
+            this.addNewTile();
+            this.updateGrid();
+            this.checkGameOver();
+        }
     }
 
     moveLeft() {

@@ -59,10 +59,11 @@ h1 {
 }
 
 .game-container {
-    background-color: #bbada0;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 20px;
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 20px auto;
+    touch-action: none; /* Prevents default touch actions like scrolling */
 }
 
 .grid-container {
@@ -134,73 +135,13 @@ h1 {
     line-height: 1.5;
 }
 
-/* Touch Controls */
 .touch-controls {
-    display: none;  /* Hidden by default, shown on mobile */
-    position: relative;
-    width: 100%;
-    max-width: 400px;
-    height: 200px;
-    margin: 20px auto;
-}
-
-.touch-area {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid #bbada0;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.touch-area:active {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.touch-area i {
-    font-size: 24px;
-    color: #776e65;
-}
-
-/* Touch area positions */
-.touch-up {
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80px;
-    height: 60px;
-}
-
-.touch-down {
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80px;
-    height: 60px;
-}
-
-.touch-left {
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 60px;
-    height: 80px;
-}
-
-.touch-right {
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 60px;
-    height: 80px;
+    display: none;
 }
 
 /* Show touch controls on mobile devices */
 @media (hover: none) and (pointer: coarse) {
     .touch-controls {
-        display: block;
+        display: none;
     }
 }
